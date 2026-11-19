@@ -1,0 +1,11 @@
+[package]
+name = "mde"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "Builder and writer for Freedesktop Desktop Entry (.desktop) files on Linux"
+readme = "README.md"
+keywords = ["desktop-entry", "freedesktop", "linux", "xdg"]
+categories = ["os", "config"]
+
+[dependencies]
