@@ -27,13 +27,17 @@ cargo add mde
 
 Basic Example
 ```rust
-use mde::{DesktopAction, DesktopEntry, DesktopEntryFile, DesktopEnvironment, Types};
+use std::path::Path;
+use mde::{
+    DesktopAction, DesktopEntry, DesktopEntryFile, DesktopEnvironment, Icon, Types,
+};
 
 fn main() -> std::io::Result<()> {
     let entry = DesktopEntry::new("Pomotimer")
         .types(Types::APPLICATION)
         .version("v0.0.1")
         .comment("Focus timer for Linux desktop sessions")
+        .icon(Icon::IconPath(Path::new("/home/user/some_icon.jpg")))
         .try_exec("/usr/local/bin/pomotimer")
         .only_show_in(vec![
             DesktopEnvironment::HYPRLAND,
@@ -45,7 +49,7 @@ fn main() -> std::io::Result<()> {
         .mime_types(vec!["text/html", "text/markdown"])
         .action(vec![
             DesktopAction::new("start-focus", "Start Focus Session")
-                .icon("/home/user/some_icon.jpg")
+                .icon(Icon::IconPath(Path::new("/home/user/some_icon.jpg")))
                 .exec("/usr/local/bin/pomotimer --focus"),
             DesktopAction::new("new-window", "New Window"),
         ]);
@@ -57,8 +61,9 @@ fn main() -> std::io::Result<()> {
 
 Localized Example
 ```rust
+use std::path::Path;
 use mde::{
-    DesktopAction, DesktopEntry, DesktopEntryFile, DesktopEnvironment, LocaleString,
+    DesktopAction, DesktopEntry, DesktopEntryFile, DesktopEnvironment, Icon, LocaleString,
     LocaleStrings, Types,
 };
 
@@ -76,6 +81,7 @@ fn main() -> std::io::Result<()> {
         LocaleString::new("fr", "Ce sont des applications de base"),
         LocaleString::new("id", "Ini adalah apps biasa"),
     ])
+    .icon(Icon::IconString("pomotimer"))
     .generic_names(vec![
         LocaleString::new("", "Utility"),
         LocaleString::new("id", "Utilitas"),
@@ -98,7 +104,7 @@ fn main() -> std::io::Result<()> {
     ])
     .action(vec![
         DesktopAction::new("start-focus", "Start Focus Session")
-            .icon("/home/user/some_icon.jpg")
+            .icon(Icon::IconPath(Path::new("/home/user/some_icon.jpg")))
             .exec("/usr/local/bin/some_bin"),
         DesktopAction::new("new-window", "New Window"),
         DesktopAction::new(
