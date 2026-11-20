@@ -16,6 +16,7 @@ Add this to your `Cargo.toml`:
 ```toml
 [dependencies]
 mde = "0.1.1"
+```
 
 or run:
 ```bash
