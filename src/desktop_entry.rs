@@ -4,7 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::utils;
+use crate::{locales::ToLocale, utils};
 
 /// Writes a [`DesktopEntry`] configuration to a `.desktop` file.
 pub struct DesktopEntryFile<'a> {
@@ -27,14 +27,14 @@ impl<'a> DesktopEntryFile<'a> {
         let mut writer = BufWriter::new(file);
         writeln!(writer, "[Desktop Entry]")?;
         writeln!(writer, "Type={}", self.desktop_entry.types)?;
-        writeln!(writer, "Name={}", self.desktop_entry.name)?;
+        utils::write_locale_list(&mut writer, "Name", &self.desktop_entry.name)?;
 
         if let Some(version) = &self.desktop_entry.version {
             writeln!(writer, "Version={version}")?;
         }
 
-        if let Some(generic_name) = &self.desktop_entry.generic_name {
-            writeln!(writer, "GenericName={}", generic_name)?;
+        if let Some(generic_names) = &self.desktop_entry.generic_names {
+            utils::write_locale_list(&mut writer, "GenericName", generic_names)?;
         }
 
         if let Some(no_display) = &self.desktop_entry.no_display {
@@ -42,7 +42,7 @@ impl<'a> DesktopEntryFile<'a> {
         }
 
         if let Some(comment) = &self.desktop_entry.comment {
-            writeln!(writer, "Comment={}", comment)?;
+            utils::write_locale_list(&mut writer, "Comment", comment)?;
         }
 
         if let Some(icon) = &self.desktop_entry.icon {
@@ -94,7 +94,7 @@ impl<'a> DesktopEntryFile<'a> {
         }
 
         if let Some(keywords) = &self.desktop_entry.keywords {
-            utils::write_semicolon_list(&mut writer, "Keywords", keywords)?;
+            utils::write_locales_list(&mut writer, "Keywords", keywords)?;
         }
 
         if let Some(startup) = &self.desktop_entry.startup_notify {
@@ -120,7 +120,7 @@ impl<'a> DesktopEntryFile<'a> {
         if let Some(action) = &self.desktop_entry.action {
             for action in action {
                 writeln!(writer, "\n[Desktop Action {}]", action.action_name)?;
-                writeln!(writer, "Name={}", action.name)?;
+                utils::write_locale_list(&mut writer, "Name", &action.name)?;
                 if let Some(icon) = &action.icon {
                     writeln!(writer, "Icon={}", icon.to_string_lossy())?;
                 }
@@ -139,11 +139,11 @@ impl<'a> DesktopEntryFile<'a> {
 #[derive(Debug, Default)]
 pub struct DesktopEntry<'a> {
     types: Types,
-    name: &'a str,
+    name: Vec<LocaleString<'a>>,
     version: Option<&'a str>,
-    generic_name: Option<&'a str>,
+    generic_names: Option<Vec<LocaleString<'a>>>,
     no_display: Option<bool>,
-    comment: Option<&'a str>,
+    comment: Option<Vec<LocaleString<'a>>>,
     icon: Option<&'a str>,
     hidden: Option<bool>,
     only_show_in: Option<Vec<DesktopEnvironment>>,
@@ -157,7 +157,7 @@ pub struct DesktopEntry<'a> {
     mime_types: Option<Vec<&'a str>>,
     categories: Option<Vec<DesktopCategories>>,
     interfaces: Option<Vec<&'a str>>,
-    keywords: Option<Vec<&'a str>>,
+    keywords: Option<Vec<LocaleStrings<'a>>>,
     startup_notify: Option<bool>,
     startup_wm_class: Option<&'a str>,
     url: Option<&'a str>,
@@ -167,7 +167,8 @@ pub struct DesktopEntry<'a> {
 
 impl<'a> DesktopEntry<'a> {
     /// Creates a new [`DesktopEntry`] with the required `Name` value.
-    pub fn new(name: &'a str) -> DesktopEntry<'a> {
+    pub fn new(name: impl ToLocale<'a>) -> DesktopEntry<'a> {
+        let name = name.to_locale();
         DesktopEntry {
             name,
             ..Default::default()
@@ -186,9 +187,53 @@ impl<'a> DesktopEntry<'a> {
         self
     }
 
-    /// Sets the `GenericName` for the application.
+    /// Sets the `GenericName` without locale for the application.
+    ///
+    /// # Notes
+    ///
+    /// Calling both [`generic_name`](Self::generic_name) and
+    /// [`generic_names`](Self::generic_names) overwrites the previous value because
+    /// both write to the same field. If you need both a default generic name and
+    /// localized ones, prefer [`generic_names`](Self::generic_names) with an empty
+    /// locale (`""`) for the default entry.
+    ///
+    /// ```no_run
+    /// use mde::{DesktopEntry, LocaleString};
+    ///
+    /// // `generic_name(...)` here overwrites the previous `generic_names(...)` call:
+    /// let entry = DesktopEntry::new("Pomotimer")
+    ///     .generic_names(vec![LocaleString::new("id", "Utilitas")])
+    ///     .generic_name("Utility");
+    /// ```
     pub fn generic_name(mut self, generic_name: &'a str) -> Self {
-        self.generic_name = Some(generic_name);
+        let container = vec![generic_name.into()];
+        self.generic_names = Some(container);
+        self
+    }
+
+    /// Sets the `GenericName` with locale for the application.
+    ///
+    /// # Notes
+    ///
+    /// Calling both [`generic_name`](Self::generic_name) and
+    /// [`generic_names`](Self::generic_names) overwrites the previous value because
+    /// both write to the same field. Pass an empty locale (`""`) inside
+    /// [`LocaleString`] if you want the default unlocalized `GenericName=...`
+    /// entry alongside localized ones.
+    ///
+    /// ```no_run
+    /// use mde::{DesktopEntry, LocaleString};
+    ///
+    /// // Overwrites earlier `generic_name(...)` value with `generic_names(...)`:
+    /// let entry = DesktopEntry::new("Pomotimer")
+    ///     .generic_name("Temporary Generic Name")
+    ///     .generic_names(vec![
+    ///         LocaleString::new("", "Utility"),
+    ///         LocaleString::new("id", "Utilitas"),
+    ///     ]);
+    /// ```
+    pub fn generic_names(mut self, generic_names: Vec<LocaleString<'a>>) -> Self {
+        self.generic_names = Some(generic_names);
         self
     }
 
@@ -198,8 +243,50 @@ impl<'a> DesktopEntry<'a> {
         self
     }
 
-    /// Sets the `Comment` describing the entry.
+    /// Sets the `Comment` without locales describing the entry.
+    ///
+    /// # Notes
+    ///
+    /// Calling both [`comment`](Self::comment) and [`comments`](Self::comments)
+    /// overwrites the previous value because both write to the same field.
+    /// If you need both a default comment and localized comments, prefer
+    /// [`comments`](Self::comments) with an empty locale (`""`) for the default entry.
+    ///
+    /// ```no_run
+    /// use mde::{DesktopEntry, LocaleString};
+    ///
+    /// // `comment(...)` here overwrites the previous `comments(...)` call:
+    /// let entry = DesktopEntry::new("Pomotimer")
+    ///     .comments(vec![LocaleString::new("id", "Pengatur waktu fokus")])
+    ///     .comment("Focus timer for Linux desktop sessions");
+    /// ```
     pub fn comment(mut self, comment: &'a str) -> Self {
+        let comment = vec![LocaleString::new("", comment)];
+        self.comment = Some(comment);
+        self
+    }
+
+    /// Sets the `Comment` with locales describing the entry.
+    ///
+    /// # Notes
+    ///
+    /// Calling both [`comment`](Self::comment) and [`comments`](Self::comments)
+    /// overwrites the previous value because both write to the same field.
+    /// Pass an empty locale (`""`) inside [`LocaleString`] if you want the
+    /// default unlocalized `Comment=...` entry alongside localized ones.
+    ///
+    /// ```no_run
+    /// use mde::{DesktopEntry, LocaleString};
+    ///
+    /// // Overwrites earlier `comment(...)` value with `comments(...)`:
+    /// let entry = DesktopEntry::new("Pomotimer")
+    ///     .comment("Temporary comment")
+    ///     .comments(vec![
+    ///         LocaleString::new("", "Focus timer for Linux desktop sessions"),
+    ///         LocaleString::new("id", "Pengatur waktu fokus"),
+    ///     ]);
+    /// ```
+    pub fn comments(mut self, comment: Vec<LocaleString<'a>>) -> Self {
         self.comment = Some(comment);
         self
     }
@@ -286,9 +373,49 @@ impl<'a> DesktopEntry<'a> {
         self
     }
 
-    /// Sets the search `Keywords` for this entry.
-    pub fn keywords(mut self, keywords: Vec<&'a str>) -> Self {
+    /// Sets the search `Keywords` without locales for this entry.
+    ///
+    /// # Notes
+    ///
+    /// Calling both [`keyword`](Self::keyword) and [`keywords`](Self::keywords)
+    /// overwrites the previous value because both write to the same field.
+    /// If you need both default and localized keywords, prefer [`keywords`](Self::keywords)
+    /// with an empty locale `""` for the default entry.
+    ///
+    /// ```no_run
+    /// use mde::{DesktopEntry, LocaleStrings};
+    ///
+    /// // `keyword(...)` here overwrites the previous `keywords(...)` call:
+    /// let entry = DesktopEntry::new("Pomotimer")
+    ///     .keywords(vec![LocaleStrings::new("id", vec!["Timer", "Fokus"])])
+    ///     .keyword(vec!["Timer", "Focus"]);
+    /// ```
+    pub fn keywords(mut self, keywords: Vec<LocaleStrings<'a>>) -> Self {
         self.keywords = Some(keywords);
+        self
+    }
+
+    /// Sets the search `Keywords` without locales for this entry.
+    ///
+    /// # Notes
+    ///
+    /// Calling both [`keyword`](Self::keyword) and [`keywords`](Self::keywords)
+    /// overwrites the previous value because both write to the same field.
+    /// If you need both default and localized keywords, prefer [`keywords`](Self::keywords)
+    /// with an empty locale `""` for the default entry.
+    ///
+    /// ```no_run
+    /// use mde::{DesktopEntry, LocaleStrings};
+    ///
+    /// // `keyword(...)` here overwrites the previous `keywords(...)` call:
+    /// let entry = DesktopEntry::new("Pomotimer")
+    ///     .keywords(vec![LocaleStrings::new("id", vec!["Timer", "Fokus"])])
+    ///     .keyword(vec!["Timer", "Focus"]);
+    /// ```
+    pub fn keyword(mut self, keyword: Vec<&'a str>) -> Self {
+        let container = LocaleStrings::new("", keyword);
+        let keyword = vec![container];
+        self.keywords = Some(keyword);
         self
     }
 
@@ -327,14 +454,17 @@ impl<'a> DesktopEntry<'a> {
 #[derive(Debug)]
 pub struct DesktopAction<'a> {
     action_name: &'a str,
-    name: &'a str,
+    name: Vec<LocaleString<'a>>,
     icon: Option<PathBuf>,
     exec: Option<PathBuf>,
 }
 
 impl<'a> DesktopAction<'a> {
-    /// Creates a new [`DesktopAction`] with an internal action name and display `Name`.
-    pub fn new(action_name: &'a str, name: &'a str) -> DesktopAction<'a> {
+    /// Creates a new [`DesktopAction`] with an internal action name and plain or localized `Name`.
+    ///
+    /// Accepts either a single `&str` (via [`ToLocale`]) or a `Vec<LocaleString>`.
+    pub fn new(action_name: &'a str, name: impl ToLocale<'a>) -> DesktopAction<'a> {
+        let name = name.to_locale();
         DesktopAction {
             action_name,
             name,
@@ -464,6 +594,59 @@ impl Display for Types {
             Types::APPLICATION => write!(f, "Application"),
             Types::LINK => write!(f, "Link"),
             Types::DIRECTORY => write!(f, "Directory"),
+        }
+    }
+}
+
+/// A localized string value for entries such as `Name[locale]=...` or `Comment[locale]=...`.
+///
+/// Pass an empty string `""` as `locale` to write the default unlocalized key.
+#[derive(Debug)]
+pub struct LocaleString<'a> {
+    /// Locale tag (for example `"id"`, `"fr"`, `"ja"`), or `""` for the default key.
+    pub locale: &'a str,
+    /// Localized or default text value.
+    pub value: &'a str,
+}
+
+impl<'a> LocaleString<'a> {
+    /// Creates a new [`LocaleString`] with the given `locale` tag and `value`.
+    pub fn new(locale: &'a str, value: &'a str) -> Self {
+        Self { locale, value }
+    }
+}
+
+impl<'a> From<&'a str> for LocaleString<'a> {
+    /// Converts a `&str` into an unlocalized [`LocaleString`] with an empty locale tag.
+    fn from(value: &'a str) -> Self {
+        Self { locale: "", value }
+    }
+}
+
+/// A list of localized string values for semicolon-separated keys such as `Keywords[locale]=...;`.
+///
+/// Pass an empty string `""` as `locale` to write the default unlocalized list.
+#[derive(Debug)]
+pub struct LocaleStrings<'a> {
+    /// Locale tag (for example `"id"`, `"fr"`, `"ja"`), or `""` for the default key.
+    pub locale: &'a str,
+    /// Values written as semicolon-separated items.
+    pub values: Vec<&'a str>,
+}
+
+impl<'a> LocaleStrings<'a> {
+    /// Creates a new [`LocaleStrings`] entry with the given `locale` tag and `values`.
+    pub fn new(locale: &'a str, values: Vec<&'a str>) -> Self {
+        Self { locale, values }
+    }
+}
+
+impl<'a> From<&'a str> for LocaleStrings<'a> {
+    /// Converts a single `&str` into an unlocalized [`LocaleStrings`] entry.
+    fn from(value: &'a str) -> Self {
+        Self {
+            locale: "",
+            values: vec![value],
         }
     }
 }

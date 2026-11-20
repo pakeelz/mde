@@ -4,7 +4,8 @@ A Rust library for building and writing Freedesktop Desktop Entry (`.desktop`) f
 
 ## Features
 
-- Builder API via [`DesktopEntry`] and [`DesktopAction`] for configuring entry fields and desktop actions.
+- Builder API via [`DesktopEntry`] and [`DesktopAction`] for configuring entry metadata, paths, desktop environments, categories, and desktop actions.
+- Localization support via [`LocaleString`], [`LocaleStrings`], and [`ToLocale`] for localized keys (`Name[locale]`, `GenericName[locale]`, `Comment[locale]`, `Keywords[locale]`).
 - Typed enums for entry [`Types`], menu [`DesktopCategories`], and [`DesktopEnvironment`] targets (including Wayland compositors and custom values).
 - Buffered file output via [`DesktopEntryFile`].
 
@@ -14,8 +15,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-mde = "0.1.0"
-```
+mde = "0.1.1"
 
 or run:
 ```bash
@@ -23,6 +23,8 @@ cargo add mde
 ```
 
 ## Usage
+
+Basic Example
 ```rust
 use mde::{DesktopAction, DesktopEntry, DesktopEntryFile, DesktopEnvironment, Types};
 
@@ -47,7 +49,79 @@ fn main() -> std::io::Result<()> {
             DesktopAction::new("new-window", "New Window"),
         ]);
 
+    DesktopEntryFile::new(entry).create("my_apps.desktop")?;
+    Ok(())
+}
+```
+
+Localized Example
+```rust
+use mde::{
+    DesktopAction, DesktopEntry, DesktopEntryFile, DesktopEnvironment, LocaleString,
+    LocaleStrings, Types,
+};
+
+fn main() -> std::io::Result<()> {
+    let entry = DesktopEntry::new(vec![
+        LocaleString::new("", "My App"),
+        LocaleString::new("id", "Applikasi ku"),
+        LocaleString::new("fr", "mon application"),
+        LocaleString::new("ja", "私のアプリ"),
+    ])
+    .types(Types::APPLICATION)
+    .version("v0.0.1")
+    .comments(vec![
+        LocaleString::new("", "This is basic apps"),
+        LocaleString::new("fr", "Ce sont des applications de base"),
+        LocaleString::new("id", "Ini adalah apps biasa"),
+    ])
+    .generic_names(vec![
+        LocaleString::new("", "Utility"),
+        LocaleString::new("id", "Utilitas"),
+        LocaleString::new("fr", "Utilitaire"),
+        LocaleString::new("ja", "ユーティリティ"),
+    ])
+    .try_exec("/usr/local/bin/pomotimer")
+    .only_show_in(vec![
+        DesktopEnvironment::HYPRLAND,
+        DesktopEnvironment::MANGOWM,
+        DesktopEnvironment::CINNAMON,
+    ])
+    .not_show_in(vec![DesktopEnvironment::GNOME])
+    .exec("/usr/local/bin/some_bin %F")
+    .mime_types(vec!["text/html", "text/markdown"])
+    .keywords(vec![
+        LocaleStrings::new("", vec!["Utility", "Browser", "Explorer"]),
+        LocaleStrings::new("id", vec!["Utility", "Browser", "Explorer"]),
+        LocaleStrings::new("fr", vec!["Utilitaire", "navigateur", "explorateur"]),
+    ])
+    .action(vec![
+        DesktopAction::new("start-focus", "Start Focus Session")
+            .icon("/home/user/some_icon.jpg")
+            .exec("/usr/local/bin/some_bin"),
+        DesktopAction::new("new-window", "New Window"),
+        DesktopAction::new(
+            "localized-action",
+            vec![
+                LocaleString::new("", "Just Test 3"),
+                LocaleString::new("id", "Hanya Test 3"),
+                LocaleString::new("fr", "il suffit d'en tester 3"),
+                LocaleString::new("ja", "テスト3だけ"),
+            ],
+        ),
+    ]);
+
     DesktopEntryFile::new(entry).create("my_app.desktop")?;
     Ok(())
 }
 ```
+
+Notes on Builder Methods
+
+- Calling singular and plural pairs that target the same underlying field—such as comment and comments, generic_name and generic_names, or keyword and keywords—will overwrite the earlier value.
+
+- Use "" as the locale tag when you want to emit the default unlocalized key alongside localized entries.
+
+## License
+
+Licensed under the MIT license. See LICENSE for details.
