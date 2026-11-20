@@ -122,7 +122,7 @@ impl<'a> DesktopEntryFile<'a> {
                 writeln!(writer, "\n[Desktop Action {}]", action.action_name)?;
                 utils::write_locale_list(&mut writer, "Name", &action.name)?;
                 if let Some(icon) = &action.icon {
-                    writeln!(writer, "Icon={}", icon.to_string_lossy())?;
+                    writeln!(writer, "Icon={}", icon)?;
                 }
                 if let Some(exec) = &action.exec {
                     writeln!(writer, "Exec={}", exec.to_string_lossy())?;
@@ -144,7 +144,7 @@ pub struct DesktopEntry<'a> {
     generic_names: Option<Vec<LocaleString<'a>>>,
     no_display: Option<bool>,
     comment: Option<Vec<LocaleString<'a>>>,
-    icon: Option<&'a str>,
+    icon: Option<Icon<'a>>,
     hidden: Option<bool>,
     only_show_in: Option<Vec<DesktopEnvironment>>,
     not_show_in: Option<Vec<DesktopEnvironment>>,
@@ -292,7 +292,20 @@ impl<'a> DesktopEntry<'a> {
     }
 
     /// Sets the `Icon` path or icon theme name for this entry.
-    pub fn icon(mut self, icon: &'a str) -> Self {
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use std::path::Path;
+    /// use mde::{DesktopEntry, Icon};
+    ///
+    /// let themed = DesktopEntry::new("Pomotimer")
+    ///     .icon(Icon::IconString("pomotimer")); // .icon("pomotimer".into())
+    ///
+    /// let from_path = DesktopEntry::new("Pomotimer")
+    ///     .icon(Icon::IconPath(Path::new("/usr/share/icons/pomotimer.png"))); // .icon(Path::new("/usr/share/icons/icon.jpg").into())
+    /// ```
+    pub fn icon(mut self, icon: Icon<'a>) -> Self {
         self.icon = Some(icon);
         self
     }
@@ -373,7 +386,7 @@ impl<'a> DesktopEntry<'a> {
         self
     }
 
-    /// Sets the search `Keywords` without locales for this entry.
+    /// Sets the search `Keywords` with locales for this entry.
     ///
     /// # Notes
     ///
@@ -455,7 +468,7 @@ impl<'a> DesktopEntry<'a> {
 pub struct DesktopAction<'a> {
     action_name: &'a str,
     name: Vec<LocaleString<'a>>,
-    icon: Option<PathBuf>,
+    icon: Option<Icon<'a>>,
     exec: Option<PathBuf>,
 }
 
@@ -474,8 +487,21 @@ impl<'a> DesktopAction<'a> {
     }
 
     /// Sets the `Icon` path or icon theme name for this action.
-    pub fn icon(mut self, icon: impl AsRef<Path>) -> Self {
-        self.icon = Some(icon.as_ref().to_path_buf());
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use std::path::Path;
+    /// use mde::{DesktopAction, Icon};
+    ///
+    /// let themed = DesktopAction::new("start-focus","Start Focus Sessions")
+    ///     .icon(Icon::IconString("pomotimer"));
+    ///
+    /// let from_path = DesktopAction::new("start-focus","Start Focus Sessions")
+    ///     .icon(Icon::IconPath(Path::new("/usr/share/icons/pomotimer.png")));
+    /// ```
+    pub fn icon(mut self, icon: Icon<'a>) -> Self {
+        self.icon = Some(icon);
         self
     }
 
@@ -648,5 +674,42 @@ impl<'a> From<&'a str> for LocaleStrings<'a> {
             locale: "",
             values: vec![value],
         }
+    }
+}
+
+/// Represents an `Icon` entry value as either a theme icon name or a file path.
+#[derive(Debug)]
+pub enum Icon<'a> {
+    /// Icon name resolved from the active icon theme.
+    IconString(&'a str),
+    /// Filesystem path to an icon file.
+    IconPath(&'a Path),
+}
+
+impl<'a> Display for Icon<'a> {
+    /// Formats the icon as a theme name or lossy filesystem path string.
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::IconString(icon_name) => {
+                write!(f, "{icon_name}")
+            }
+            Self::IconPath(path) => {
+                write!(f, "{}", path.to_string_lossy())
+            }
+        }
+    }
+}
+
+impl<'a> From<&'a str> for Icon<'a> {
+    /// Converts a string slice into [`Icon::IconString`].
+    fn from(value: &'a str) -> Self {
+        Self::IconString(value)
+    }
+}
+
+impl<'a> From<&'a Path> for Icon<'a> {
+    /// Converts a [`Path`] reference into [`Icon::IconPath`].
+    fn from(value: &'a Path) -> Self {
+        Self::IconPath(value)
     }
 }

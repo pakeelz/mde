@@ -7,13 +7,17 @@
 //! # Simple Examples
 //!
 //! ```no_run
-//! use mde::{DesktopAction, DesktopEntry, DesktopEntryFile, DesktopEnvironment, Types};
+//! use std::path::Path;
+//! use mde::{
+//!     DesktopAction, DesktopEntry, DesktopEntryFile, DesktopEnvironment, Icon, Types,
+//! };
 //!
 //! fn main() -> std::io::Result<()> {
 //!     let entry = DesktopEntry::new("Pomotimer")
 //!         .types(Types::APPLICATION)
 //!         .version("v0.0.1")
 //!         .comment("Focus timer for Linux desktop sessions")
+//!         .icon(Icon::IconPath(Path::new("/home/user/some_icon.jpg")))
 //!         .try_exec("/usr/local/bin/pomotimer")
 //!         .only_show_in(vec![
 //!             DesktopEnvironment::HYPRLAND,
@@ -25,7 +29,7 @@
 //!         .mime_types(vec!["text/html", "text/markdown"])
 //!         .action(vec![
 //!             DesktopAction::new("start-focus", "Start Focus Session")
-//!                 .icon("/home/user/some_icon.jpg")
+//!                 .icon(Icon::IconPath(Path::new("/home/user/some_icon.jpg")))
 //!                 .exec("/usr/local/bin/pomotimer --focus"),
 //!             DesktopAction::new("new-window", "New Window"),
 //!         ]);
@@ -43,6 +47,7 @@
 //! Name=Pomotimer
 //! Version=v0.0.1
 //! Comment=Focus timer for Linux desktop sessions
+//! Icon=/home/user/some_icon.jpg
 //! OnlyShowIn=Hyprland;Mangowm;Cinnamon;
 //! NotShowIn=Gnome;
 //! TryExec=/usr/local/bin/pomotimer
@@ -61,8 +66,9 @@
 //! # Full Examples
 //!
 //! ```no_run
+//! use std::path::Path;
 //! use mde::{
-//!     DesktopAction, DesktopEntry, DesktopEntryFile, DesktopEnvironment, LocaleString,
+//!     DesktopAction, DesktopEntry, DesktopEntryFile, DesktopEnvironment, Icon, LocaleString,
 //!     LocaleStrings, Types,
 //! };
 //!
@@ -75,12 +81,12 @@
 //!     ])
 //!     .types(Types::APPLICATION)
 //!     .version("v0.0.1")
-//!     .comment("This is some apps")
 //!     .comments(vec![
 //!         LocaleString::new("", "This is basic apps"),
 //!         LocaleString::new("fr", "Ce sont des applications de base"),
 //!         LocaleString::new("id", "Ini adalah apps biasa"),
 //!     ])
+//!     .icon(Icon::IconString("pomotimer"))
 //!     .try_exec("/usr/local/bin/pomotimer")
 //!     .only_show_in(vec![
 //!         DesktopEnvironment::HYPRLAND,
@@ -89,14 +95,14 @@
 //!     ])
 //!     .not_show_in(vec![DesktopEnvironment::GNOME])
 //!     .exec("/usr/local/bin/some_bin %F")
-//!     .mime_types(vec!["text/html", "test/markdown"])
+//!     .mime_types(vec!["text/html", "text/markdown"])
 //!     .action(vec![
-//!         DesktopAction::new("Test", "Just Test")
-//!             .icon("/home/user/some_icon.jpg")
+//!         DesktopAction::new("start-focus", "Start Focus Session")
+//!             .icon(Icon::IconPath(Path::new("/home/user/some_icon.jpg")))
 //!             .exec("/usr/local/bin/some_bin"),
-//!         DesktopAction::new("Test2", "Just Test2"),
+//!         DesktopAction::new("new-window", "New Window"),
 //!         DesktopAction::new(
-//!             "Test3",
+//!             "localized-action",
 //!             vec![
 //!                 LocaleString::new("", "Just Test 3"),
 //!                 LocaleString::new("id", "Hanya Test 3"),
@@ -111,7 +117,6 @@
 //!         LocaleString::new("fr", "Utilitaire"),
 //!         LocaleString::new("ja", "ユーティリティ"),
 //!     ])
-//!     .keyword(vec!["Utility", "Browser", "Explorer"])
 //!     .keywords(vec![
 //!         LocaleStrings::new("", vec!["Utility", "Browser", "Explorer"]),
 //!         LocaleStrings::new("id", vec!["Utility", "Browser", "Explorer"]),
@@ -140,24 +145,25 @@
 //! Comment=This is basic apps
 //! Comment[fr]=Ce sont des applications de base
 //! Comment[id]=Ini adalah apps biasa
+//! Icon=pomotimer
 //! OnlyShowIn=Hyprland;Mangowm;Cinnamon;
 //! NotShowIn=Gnome;
 //! TryExec=/usr/local/bin/pomotimer
 //! Exec=/usr/local/bin/some_bin %F
-//! MimeType=text/html;test/markdown;
+//! MimeType=text/html;text/markdown;
 //! Keywords=Utility;Browser;Explorer;
 //! Keywords[id]=Utility;Browser;Explorer;
 //! Keywords[fr]=Utilitaire;navigateur;explorateur;
 //!
-//! [Desktop Action Test]
-//! Name=Just Test
+//! [Desktop Action start-focus]
+//! Name=Start Focus Session
 //! Icon=/home/user/some_icon.jpg
 //! Exec=/usr/local/bin/some_bin
 //!
-//! [Desktop Action Test2]
-//! Name=Just Test2
+//! [Desktop Action new-window]
+//! Name=New Window
 //!
-//! [Desktop Action Test3]
+//! [Desktop Action localized-action]
 //! Name=Just Test 3
 //! Name[id]=Hanya Test 3
 //! Name[fr]=il suffit d'en tester 3
@@ -165,11 +171,12 @@
 //! ```
 
 mod desktop_entry;
+/// Localization helpers and traits for desktop entry fields.
 pub mod locales;
 mod utils;
 
 pub use desktop_entry::{
-    DesktopAction, DesktopCategories, DesktopEntry, DesktopEntryFile, DesktopEnvironment,
+    DesktopAction, DesktopCategories, DesktopEntry, DesktopEntryFile, DesktopEnvironment, Icon,
     LocaleString, LocaleStrings, Types,
 };
 
